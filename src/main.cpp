@@ -22,15 +22,16 @@ uint32_t minute = Adafruit_NeoPixel::Color(16, 0, 0);
 uint32_t hour = Adafruit_NeoPixel::Color(0, 0, 16);
 uint32_t blank = Adafruit_NeoPixel::Color(0, 0, 0);
 
-void setup() {
+char hostName[] = "worldtimeapi.org";
+
+void setup()
+{
     WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
     // it is a good practice to make sure your code sets wifi mode how you want it.
 
-    // put your setup code here, to run once:
     Serial.begin(115200);
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
-    NeoPixel.begin();
 
     //WiFiManager, Local intialization. Once its business is done, there is no need to keep it around
     WiFiManager wm;
@@ -49,46 +50,109 @@ void setup() {
     // res = wm.autoConnect("AutoConnectAP"); // anonymous ap
     res = wm.autoConnect("ESP_Clock", "ESP_Clock"); // password protected ap
 
-    if (!res) {
+    if (!res)
+    {
         Serial.println("Failed to connect");
         // ESP.restart();
-    } else {
+    }
+    else
+    {
         //if you get here you have connected to the WiFi
         Serial.println("connected...yeey :)");
     }
+
+    NeoPixel.begin();
     NeoPixel.clear();
-    for (int pixel = 0; pixel < NUM_PIXELS; pixel += 5) {
-        if (pixel % 15 == 0) {
+    for (int pixel = 0; pixel < NUM_PIXELS; pixel += 5)
+    {
+        if (pixel % 15 == 0)
+        {
             NeoPixel.setPixelColor(pixel, cardinal);
-        } else {
+        }
+        else
+        {
             NeoPixel.setPixelColor(pixel, marker);
         }
     }
     NeoPixel.show();
+
+    WiFiClient client;
+    if (client.connect(hostName, 80))
+    {
+        Serial.print("Connected to server: ");
+        Serial.println(client.remoteIP());
+    }
+    else
+    {
+        Serial.println("Failed to connect to server");
+    }
+
+    client.println("GET /api/ip HTTP/1.1");
+    Serial.println("GET /api/ip HTTP/1.1");
+    client.println("Host: " + String(hostName));
+    Serial.println("Host: " + String(hostName));
+//    client.println("Connection: close");
+//    Serial.println("Connection: close");
+    client.println("Accept: */*");
+    Serial.println("Accept: */*");
+    client.println();
+    Serial.println();
+
+    while (!client.available())
+        ;
+
+    while (client.available())
+    {
+        char c = client.read();
+        Serial.print(c);
+    }
+    Serial.println();
+    Serial.println("End message");
+
+    if (!client.connected())
+    {
+        Serial.println("disconnected");
+        client.stop();
+    }
+    else
+    {
+        Serial.println("Not connected");
+    }
 }
 
-void loop() {
+void loop()
+{
 // write your code here
     Serial.println("Hello. world!");
 
     int last_pixel = (minutes + 30) % 60;
-    if (last_pixel % 5 == 0) {
-        if (last_pixel % 15 == 0) {
+    if (last_pixel % 5 == 0)
+    {
+        if (last_pixel % 15 == 0)
+        {
             NeoPixel.setPixelColor(last_pixel, cardinal);
-        } else {
+        }
+        else
+        {
             NeoPixel.setPixelColor(last_pixel, marker);
         }
-    } else {
+    }
+    else
+    {
         NeoPixel.setPixelColor(last_pixel, blank);
     }
 
     ++minutes;
     minutes %= 60;
-    if (minutes == 0) {
+    if (minutes == 0)
+    {
         last_pixel = (hours * 5 + 30) % 60;
-        if (last_pixel % 15 == 0) {
+        if (last_pixel % 15 == 0)
+        {
             NeoPixel.setPixelColor(last_pixel, cardinal);
-        } else {
+        }
+        else
+        {
             NeoPixel.setPixelColor(last_pixel, marker);
         }
 
