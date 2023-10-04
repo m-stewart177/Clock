@@ -18,7 +18,7 @@ int hours = 0;
 
 char hostName[] = "worldtimeapi.org";
 
-LedClock::LedClock* ledClock;
+LedClock::LedClock *ledClock;
 
 void setup()
 {
@@ -65,8 +65,7 @@ void setup()
     client.println();
     Serial.println();
 
-    while (!client.available())
-        ;
+    while (!client.available());
 
     while (client.available())
     {
