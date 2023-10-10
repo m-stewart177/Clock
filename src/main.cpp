@@ -1,8 +1,8 @@
 #include <Arduino.h>
 
 #include <Adafruit_NeoPixel.h>
+#include <RV3028.h>
 
-#include <WiFi.h>
 #include <WiFiUtils.h>
 #include <LedClock.h>
 
@@ -11,14 +11,14 @@
 #define NEOPIXEL_PIN    16
 #define NUM_PIXELS      60
 
+#define RV3028_I2C_ADDR 0x52
+
 #define HOLD 200
 
-int minutes = 0;
-int hours = 0;
-
-char hostName[] = "worldtimeapi.org";
+//#define DEBUG
 
 LedClock::LedClock *ledClock;
+RV3028* RTC;
 
 void setup()
 {
@@ -28,7 +28,6 @@ void setup()
     digitalWrite(LED_BUILTIN, HIGH);
 
     InitialiseWiFi();
-
 
     LedClock::DisplayConfiguration config;
     config.NeoPixelPin = NEOPIXEL_PIN;
@@ -43,61 +42,62 @@ void setup()
     ledClock = new LedClock::LedClock(config, colours);
     ledClock->InitialiseDisplay();
 
-    WiFiClient client;
-    if (client.connect(hostName, 80))
-    {
-        Serial.print("Connected to server: ");
-        Serial.println(client.remoteIP());
-    }
-    else
-    {
-        Serial.println("Failed to connect to server");
-    }
+    JSONVar json = GetJson("worldtimeapi.org", 80, "/api/ip");
 
-    client.println("GET /api/ip HTTP/1.1");
-    Serial.println("GET /api/ip HTTP/1.1");
-    client.println("Host: " + String(hostName));
-    Serial.println("Host: " + String(hostName));
-//    client.println("Connection: close");
-//    Serial.println("Connection: close");
-    client.println("Accept: */*");
-    Serial.println("Accept: */*");
-    client.println();
+    Serial.println(json);
     Serial.println();
 
-    while (!client.available());
+    uint32_t internet_unix_time = (unsigned long)json["unixtime"];
+    String utc_date_time = json["utc_datetime"];
+    String local_date_time = json["datetime"];
 
-    while (client.available())
-    {
-        char c = client.read();
-        Serial.print(c);
-    }
-    Serial.println();
-    Serial.println("End message");
+    Serial.print("Unix time: ");
+    Serial.println( (unsigned long)json["unixtime"]);
+    Serial.print("Date time (local):");
+    Serial.println(local_date_time);
+    Serial.print("Date time (UTC):");
+    Serial.println(utc_date_time);
 
-    if (!client.connected())
+    Serial.println("       RTC Functions      ");
+    Serial.println("--------------------------");
+
+    // Start RTC
+    RTC = new RV3028();
+    RTC->Begin();
+    uint32_t rtc_unix_time = RTC->Get_UNIX_Time();
+    if (abs((int)(rtc_unix_time - internet_unix_time)) > 2)
     {
-        Serial.println("disconnected");
-        client.stop();
-    }
-    else
-    {
-        Serial.println("Not connected");
+        byte year = local_date_time.substring(2, 4).toInt();
+        byte month = local_date_time.substring(5, 7).toInt();
+        byte day = local_date_time.substring(8, 10).toInt();
+        byte hour = local_date_time.substring(11,13).toInt();
+        byte minute = local_date_time.substring(14, 16).toInt();
+        byte second = local_date_time.substring(17, 19).toInt();
+
+        Serial.print(String(year) + "-" + String(month) + "-" + String(day) + " ");
+        Serial.println(String(hour) + ":" + String(minute) + ":" + String(second));
+
+        RTC->Set_Time(second, minute, hour, day, month, year);
+        RTC->Update_Time_Stamp();
+        RTC->Set_UNIX_Time(internet_unix_time);
     }
 }
 
 void loop()
 {
 // write your code here
-    Serial.println("Hello. world!");
+    RTC->Update_Time_Stamp();
+//    Serial.println("Hello. world!");
+    Serial.println(RTC->Time_Stamp);
+    Serial.println(RTC->Get_UNIX_Time());
 
-    ++minutes;
-    minutes %= 60;
-    if (minutes == 0)
-    {
-        ++hours;
-        hours %= 12;
-    }
+#ifdef DEBUG
+    int minutes = RTC->Get_Second();
+    int hours = RTC->Get_Minute() % 12;
+#else
+    int minutes = RTC->Get_Minute();
+    int hours = RTC->Get_Hour();
+#endif
 
     ledClock->UpdateTime(hours, minutes);
     delay(HOLD);
