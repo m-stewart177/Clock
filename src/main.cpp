@@ -1,10 +1,7 @@
-#include <Arduino.h>
-
-#include <Adafruit_NeoPixel.h>
-
 #include <WiFiUtils.h>
 #include <LedClock.h>
-#include "../lib/RealTimeClock/RealTimeClock.h"
+#include <RealTimeClock.h>
+#include <Sensors.h>
 
 // Set LED_BUILTIN if it is not defined by Arduino framework
 #define LED_BUILTIN     13
@@ -17,6 +14,7 @@
 
 LedClock::LedClock *ledClock;
 RealTimeClock::RealTimeClock* RTC;
+Sensors::Sensors* sensors;
 
 void setup()
 {
@@ -46,6 +44,9 @@ void setup()
     // Start RTC
     RTC = new RealTimeClock::RealTimeClock();
     RTC->Initialise();
+
+    sensors = new Sensors::Sensors();
+    sensors->Begin();
 }
 
 void loop()
