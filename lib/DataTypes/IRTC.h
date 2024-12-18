@@ -2,7 +2,16 @@
 
 #include <DataTypes.h>
 
+#ifdef ARDUINO
 #include <Arduino.h>
+#else
+#include <string>
+
+using String = std::string;
+using byte = u_int8_t;
+using time_t = long;
+#endif
+
 
 namespace HardwareClock
 {

@@ -1,5 +1,8 @@
 #include "RealTimeClock.h"
 
+#include <iostream>
+#include <ostream>
+
 #define InternetTimeApi "worldtimeapi.org"
 #define InternetTimeApiPort 80
 
@@ -22,7 +25,12 @@ namespace RealTimeClock
     {
         if (!m_RTC.Begin())
         {
+#ifdef ARDUINO
             Serial.println("Failed to initialize RTC");
+#else
+            std::cout << "Failed to initialize RTC" << std::endl;
+#endif
+
         }
 
         m_dateTime = m_RTC.GetDateTime();
