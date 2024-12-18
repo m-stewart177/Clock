@@ -4,6 +4,8 @@
 
 #pragma once
 
+# include "ILedClock.h"
+
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 
@@ -11,33 +13,33 @@ namespace LedClock
 {
     struct DisplayConfiguration
     {
-        uint16_t NeoPixelPin;       // GPIO pin for NeoPixels
-        int16_t DisplaySize;        // Total number of NeoPixels in display
-        uint16_t NeoPixelType;      // Type of NeoPixel
+        uint16_t NeoPixelPin; // GPIO pin for NeoPixels
+        int16_t DisplaySize; // Total number of NeoPixels in display
+        uint16_t NeoPixelType; // Type of NeoPixel
         int16_t ClockRingSize = 60; // Number of NeoPixels in Clock ring
         int16_t ClockRingStart = 0; // NeoPixel "address" for first pixel in clock ring
-        int16_t ClockPhase;         // Pixel offest to 12 o'clock position in the ring
-                                    // For example, if pixel 0 is at 6 o'clock position
-                                    // ClockPhase = 30
+        int16_t ClockPhase; // Pixel offset to 12 o'clock position in the ring
+        // For example, if pixel 0 is at 6 o'clock position
+        // ClockPhase = 30
     };
 
     struct ClockDisplayMarkerColours
     {
-        uint32_t Marker = Adafruit_NeoPixel::Color(8, 8, 8);    // Default hour marker
+        uint32_t Marker = Adafruit_NeoPixel::Color(8, 8, 8); // Default hour marker
         uint32_t Cardinal = Adafruit_NeoPixel::Color(0, 32, 0); // 12, 3, 6, and 9 hour
-        uint32_t Minute = Adafruit_NeoPixel::Color(16, 0, 0);   // Minute "hand"
-        uint32_t Hour = Adafruit_NeoPixel::Color(0, 0, 16);     // Hour "hand"
+        uint32_t Minute = Adafruit_NeoPixel::Color(16, 16, 0); // Minute "hand"
+        uint32_t Hour = Adafruit_NeoPixel::Color(0, 16, 16); // Hour "hand"
         uint32_t Blank = Adafruit_NeoPixel::Color(0, 0, 0);
     };
 
-    class LedClock
+    class LedClock final : public ILedClock
     {
     public:
         LedClock(DisplayConfiguration config, ClockDisplayMarkerColours clockClours);
 
     public:
-        void InitialiseDisplay();
-        void UpdateTime(int hours, int minutes);
+        void InitialiseDisplay() override;
+        void UpdateTime(int hours, int minutes) override;
 
     private:
         int16_t m_clockRingSize;
@@ -46,5 +48,4 @@ namespace LedClock
         Adafruit_NeoPixel m_neoPixel;
         ClockDisplayMarkerColours m_clockColours;
     };
-
 } // LedClock

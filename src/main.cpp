@@ -1,7 +1,9 @@
 #include <WiFiUtils.h>
 #include <LedClock.h>
 #include <RealTimeClock.h>
-#include <Sensors.h>
+
+#include <WorldTimeApiClock.h>
+#include <RV3028_RTC.h>
 
 // Set LED_BUILTIN if it is not defined by Arduino framework
 #define LED_BUILTIN     13
@@ -12,13 +14,13 @@
 
 //#define DEBUG
 
-LedClock::LedClock *ledClock;
+
+LedClock::LedClock* ledClock;
 RealTimeClock::RealTimeClock* RTC;
-Sensors::Sensors* sensors;
+bool doCheck = true;
 
 void setup()
 {
-
     Serial.begin(115200);
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, HIGH);
@@ -42,19 +44,18 @@ void setup()
     Serial.println("--------------------------");
 
     // Start RTC
-    RTC = new RealTimeClock::RealTimeClock();
+    auto* internetClock = new InternetClock::WorldTimeApiClock();
+    auto* hardwareClock = new HardwareClock::RV3028_RTC();
+    RTC = new RealTimeClock::RealTimeClock(*hardwareClock, *internetClock);
     RTC->Initialise();
-
-    sensors = new Sensors::Sensors();
-    sensors->Begin();
+    Serial.println("--------------------------");
 }
 
 void loop()
 {
-//    Serial.println("Hello. world!");
     Serial.println(RTC->GetUnixTime());
 
-    RealTimeClock::DateTime dateTime = RTC->GetDateTime();
+    DateTime dateTime = RTC->GetDateTime();
 #ifdef DEBUG
     int minutes = dateTime.Second;
     int hours = dateTime.Minute % 12;
@@ -63,10 +64,18 @@ void loop()
     int hours = dateTime.Hour;
 #endif
 
-    if (dateTime.Hour == 2 && dateTime.Minute == 0 && dateTime.Second)
+    if (doCheck)
     {
-        Serial.println("Check Daylights Savings Time.");
-        RTC->CheckDaylightSavingsTime();
+        if (dateTime.Hour == 2 && dateTime.Minute == 0 && dateTime.Second == 0)
+        {
+            Serial.println("Check Daylights Savings Time.");
+            RTC->CheckDaylightSavingsTime();
+            doCheck = false;
+        }
+    }
+    else
+    {
+        doCheck = (dateTime.Hour == 1 && dateTime.Minute > 59 && dateTime.Second > 0);
     }
 
     Serial.println(RTC->TimeStamp());
