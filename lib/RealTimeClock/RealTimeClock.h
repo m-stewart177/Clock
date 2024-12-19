@@ -30,9 +30,11 @@ namespace RealTimeClock
     public:
         void Initialise() override;
         void CheckDaylightSavingsTime() override;
-        DateTime& GetDateTime() override;
-        time_t GetUnixTime() override;
-        String TimeStamp() override;
+        DateTime& GetDateTime() const override;
+        time_t GetUnixTime() const override;
+        String TimeStamp() const override;
+
+        bool IsDaylightSavingChangeSet() const override;
 
     private:
         void UpdateToInternetTime();
@@ -40,8 +42,8 @@ namespace RealTimeClock
     private:
         IRTC& m_RTC;
         IInternetClock& m_internetClock;
-        DateTime m_dateTime;
-        time_t m_unixTime;
+        mutable DateTime m_dateTime;
+        mutable time_t m_unixTime;
         bool m_daylightSavingsTime;
         byte m_dstOffsetMinutes;
         DateTime m_dstChange;

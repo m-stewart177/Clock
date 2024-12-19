@@ -56,6 +56,8 @@ void loop()
     Serial.println(RTC->GetUnixTime());
 
     DateTime dateTime = RTC->GetDateTime();
+    doCheck = !RTC->IsDaylightSavingChangeSet() || (dateTime.Hour > 1 && dateTime.Hour < 3);
+
 #ifdef DEBUG
     int minutes = dateTime.Second;
     int hours = dateTime.Minute % 12;
@@ -66,16 +68,8 @@ void loop()
 
     if (doCheck)
     {
-        if (dateTime.Hour == 2 && dateTime.Minute == 0 && dateTime.Second == 0)
-        {
-            Serial.println("Check Daylights Savings Time.");
-            RTC->CheckDaylightSavingsTime();
-            doCheck = false;
-        }
-    }
-    else
-    {
-        doCheck = (dateTime.Hour == 1 && dateTime.Minute > 59 && dateTime.Second > 0);
+        Serial.println("Check Daylights Savings Time.");
+        RTC->CheckDaylightSavingsTime();
     }
 
     Serial.println(RTC->TimeStamp());

@@ -12,18 +12,8 @@ using time_t = long;
 
 struct DateTime
 {
-public:
     DateTime() = default;
-
-    DateTime(byte year, byte month, byte date, byte hour, byte minute, byte second) :
-        Year(year),
-        Month(month),
-        Date(date),
-        Hour(hour),
-        Minute(minute),
-        Second(second)
-    {
-    }
+    DateTime(byte year, byte month, byte date, byte hour, byte minute, byte second);
 
     byte Year;
     byte Month;
@@ -34,4 +24,6 @@ public:
 
     bool operator>(const DateTime& other) const;
     bool operator==(DateTime const& other) const;
+
+    bool IsSpecified() const;
 };
