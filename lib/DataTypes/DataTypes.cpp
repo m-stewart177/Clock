@@ -1,5 +1,16 @@
 #include "DataTypes.h"
 
+DateTime::DateTime(byte const year, byte const month, byte const date,
+                   byte const hour, byte const minute, byte const second) :
+    Year(year),
+    Month(month),
+    Date(date),
+    Hour(hour),
+    Minute(minute),
+    Second(second)
+{
+}
+
 bool DateTime::operator>(DateTime const& other) const
 {
     if (this->Year > other.Year)
@@ -71,4 +82,9 @@ bool DateTime::operator==(DateTime const& other) const
     }
 
     return true;
+}
+
+bool DateTime::IsSpecified() const
+{
+    return Year != 0;
 }

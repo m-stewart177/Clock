@@ -1,5 +1,8 @@
 #include "RealTimeClock.h"
 
+#include <iostream>
+#include <ostream>
+
 #define InternetTimeApi "worldtimeapi.org"
 #define InternetTimeApiPort 80
 
@@ -22,7 +25,12 @@ namespace RealTimeClock
     {
         if (!m_RTC.Begin())
         {
+#ifdef ARDUINO
             Serial.println("Failed to initialize RTC");
+#else
+            std::cout << "Failed to initialize RTC" << std::endl;
+#endif
+
         }
 
         m_dateTime = m_RTC.GetDateTime();
@@ -69,23 +77,28 @@ namespace RealTimeClock
         }
     }
 
-    DateTime& RealTimeClock::GetDateTime()
+    DateTime& RealTimeClock::GetDateTime() const
     {
         m_dateTime = m_RTC.GetDateTime();;
 
         return m_dateTime;
     }
 
-    time_t RealTimeClock::GetUnixTime()
+    time_t RealTimeClock::GetUnixTime() const
     {
         m_unixTime = m_RTC.GetUnixTime();
 
         return m_unixTime;
     }
 
-    String RealTimeClock::TimeStamp()
+    String RealTimeClock::TimeStamp() const
     {
         return m_RTC.GetTimeStamp();
+    }
+
+    bool RealTimeClock::IsDaylightSavingChangeSet() const
+    {
+        return m_dstChange.IsSpecified();
     }
 
     void RealTimeClock::UpdateToInternetTime()
@@ -97,6 +110,7 @@ namespace RealTimeClock
         auto const unixTime = m_internetClock.GetUnixTime();
 
         m_RTC.SaveSettings(internetDateTime, internetDaylightSavingsTime, dstOffsetMinutes, dstChangeDateTime);
+
         m_dstChange = dstChangeDateTime;
         m_dstOffsetMinutes = dstOffsetMinutes;
         m_daylightSavingsTime = internetDaylightSavingsTime;
