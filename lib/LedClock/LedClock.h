@@ -28,7 +28,7 @@ namespace LedClock
         uint32_t Marker = Adafruit_NeoPixel::Color(8, 8, 8); // Default hour marker
         uint32_t Cardinal = Adafruit_NeoPixel::Color(0, 32, 0); // 12, 3, 6, and 9 hour
         uint32_t Minute = Adafruit_NeoPixel::Color(16, 16, 0); // Minute "hand"
-        uint32_t Hour = Adafruit_NeoPixel::Color(0, 16, 16); // Hour "hand"
+        uint32_t Hour = Adafruit_NeoPixel::Color(16, 6, 0); // Hour "hand"
         uint32_t Blank = Adafruit_NeoPixel::Color(0, 0, 0);
     };
 
