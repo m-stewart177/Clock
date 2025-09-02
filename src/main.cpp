@@ -1,4 +1,7 @@
-// Starting over
+#include "Arduino.h"
+
+// Set LED_BUILTIN if it is not defined by Arduino framework
+#define LED_BUILTIN     13
 
 void setup()
 {
