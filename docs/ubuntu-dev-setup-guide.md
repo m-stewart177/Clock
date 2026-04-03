@@ -466,11 +466,203 @@ sudo ./install_drivers
 
 ---
 
-## Session 6 — Remote AI Development
+## Session 6 — PIC Assembly Development
+
+**Estimated time: 2–3 hours**
+
+This session sets up a PIC microcontroller assembly development environment for use with the
+**HP488 PIC Board**, a **PICKit 3** programmer/debugger, and an **ICD (In-Circuit Debugger)
+adapter**.
+
+### Tools
+
+| Tool | Purpose |
+|------|---------|
+| `gputils` (`gpasm`, `gplink`, `gplib`) | Open-source GNU PIC assembler and linker |
+| MPLAB X IDE | Microchip's official IDE — required for PICKit 3 and ICD debugging |
+| MPLAB XC8 Compiler | Microchip's 8-bit PIC C/assembly compiler (integrates with MPLAB X) |
+| MPLAB IPE | Standalone programmer (bundled with MPLAB X) |
+
+### 6a — Install gputils (open-source PIC assembler)
+
+`gputils` provides `gpasm` (assembler), `gplink` (linker), and `gplib` (librarian) for PIC
+microcontrollers. It is available in the Ubuntu package repository:
+
+```bash
+sudo apt install -y gputils
+gpasm --version
+```
+
+To assemble and link a PIC program without MPLAB X:
+
+```bash
+gpasm -p p16F877A my_program.asm        # assemble (adjust device as needed)
+gplink -m -o my_program.hex my_program.o   # link to Intel HEX
+```
+
+### 6b — Install MPLAB X IDE (required for PICKit 3 / ICD)
+
+MPLAB X IDE provides full PICKit 3 programmer and ICD debugger support on Linux.
+
+1. Download the latest Linux installer from Microchip's website:
+
+   ```
+   https://www.microchip.com/mplab/mplab-x-ide
+   ```
+
+   Choose the **Linux** version (`.tar`).
+
+2. Extract and run the installer:
+
+   ```bash
+   tar -xf MPLABX-v*.tar
+   cd MPLABX-v*-linux-installer/
+   sudo ./MPLABX-v*-linux-installer.sh
+   ```
+
+   Install to the default path `/opt/microchip/mplabx/<version>`.
+
+3. Add MPLAB tools to your `PATH` (add to `~/.bashrc`):
+
+   ```bash
+   echo 'export PATH="/opt/microchip/mplabx/$(ls /opt/microchip/mplabx/ | tail -1)/mplab_platform/bin:$PATH"' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+4. Verify:
+
+   ```bash
+   mplabx --version    # or launch: /opt/microchip/mplabx/<version>/bin/mplabx
+   ```
+
+### 6c — Install MPLAB XC8 Compiler
+
+The XC8 compiler targets all 8-bit PIC devices and integrates directly with MPLAB X.
+
+1. Download the Linux installer from:
+
+   ```
+   https://www.microchip.com/en-us/tools-resources/develop/mplab-xc-compilers
+   ```
+
+2. Install:
+
+   ```bash
+   chmod +x xc8-v*.sh
+   sudo ./xc8-v*.sh --mode unattended --unattendedmodeui minimal \
+       --installdir /opt/microchip/xc8/<version>
+   ```
+
+3. Verify:
+
+   ```bash
+   xc8 --version
+   ```
+
+   MPLAB X will auto-detect XC8 on first launch.
+
+### 6d — PICKit 3 USB access (udev rules)
+
+The PICKit 3 is a USB HID device. Grant non-root access with a udev rule:
+
+```bash
+sudo tee /etc/udev/rules.d/99-microchip-pickit3.rules << 'EOF'
+# Microchip PICKit 3 programmer/debugger
+SUBSYSTEM=="usb", ATTR{idVendor}=="04d8", ATTR{idProduct}=="900a", \
+    MODE="0660", GROUP="plugdev", TAG+="uaccess"
+EOF
+
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG plugdev $USER
+# Log out and back in to pick up the new group
+```
+
+Verify the PICKit 3 is detected after plugging in via USB:
+
+```bash
+lsusb | grep -i "04d8"   # should show "Microchip Technology, Inc. PICkit3"
+```
+
+### 6e — ICD adapter wiring (PICKit 3 ↔ HP488 board)
+
+The ICD (In-Circuit Debugger) 6-pin connector on the PICKit 3 maps as follows:
+
+| PICKit 3 pin | Signal | HP488 ICD header |
+|:---:|--------|:---:|
+| 1 | MCLR / VPP | MCLR |
+| 2 | VDD (target power) | VDD |
+| 3 | GND | GND |
+| 4 | ICSPDAT (PGD) | PGD |
+| 5 | ICSPCLK (PGC) | PGC |
+| 6 | LVP (optional) | LVP |
+
+> **Note:** Verify pin 1 orientation on the HP488 board's ICD header — pin 1 is usually
+> marked with a triangle or notch. Only connect VDD (pin 2) if the HP488 board is not
+> already powered independently.
+
+Enable LVP (Low-Voltage Programming) in your MPLAB X project if the target PIC requires it:
+**Project Properties → PICKit 3 → Power → Low Voltage Programming Mode**.
+
+### 6f — Programming and debugging workflow
+
+#### Option 1: MPLAB X IDE (full GUI, recommended for ICD debugging)
+
+1. Open MPLAB X IDE.
+2. **File → New Project** → select **Microchip Embedded → Standalone Project**.
+3. Choose your PIC device (e.g., `PIC16F877A`) and select **PICKit 3** as the hardware tool.
+4. Select the **ICD** connector type in Project Properties → PICKit 3 → Connection.
+5. Add your `.asm` source files and set the language toolsuite to **MPASM™ Assembler** (or
+   XC8 if using C).
+6. **Run → Build Project**, then **Run → Program Device**.
+7. For live debugging: **Debug → Debug Project** — breakpoints, watch variables, and
+   single-step are all available via the ICD connection.
+
+#### Option 2: Command-line with gpasm + MPLAB IPE
+
+Assemble with gputils and flash with MPLAB IPE (bundled with MPLAB X):
+
+```bash
+# Assemble
+gpasm -p p16F877A -o my_program.o my_program.asm
+gplink -m -o my_program.hex my_program.o
+
+# Flash via MPLAB IPE (non-interactive)
+/opt/microchip/mplabx/<version>/mplab_ipe/ipecmd.sh \
+    -TPPK3 \
+    -P16F877A \
+    -F my_program.hex \
+    -M
+```
+
+> Replace `<version>` and the device (`16F877A`) with your actual values.
+> `-M` programs all memory regions; add `-E` to erase first if needed.
+
+### 6g — VS Code extension for PIC assembly
+
+Install the **MPASM** syntax-highlighting extension for VS Code:
+
+```
+Ext ID: bjorn-w.mpasm
+```
+
+Or use a generic assembly highlighter:
+
+```
+Ext ID: maziac.asm-code-lens
+```
+
+---
+
+**⏹ Session 6 stopping point** — PIC assembly toolchain installed, PICKit 3 accessible,
+HP488 board programmed and debugged over ICD.
+
+---
+
+## Session 7 — Remote AI Development
 
 **Estimated time: 1–2 hours (on local machine) + server admin time**
 
-### 6a — SSH setup (local machine)
+### 7a — SSH setup (local machine)
 
 Generate an SSH key pair if you don't already have one:
 
@@ -497,7 +689,7 @@ Host aiserver
 
 Then simply: `ssh aiserver`
 
-### 6b — VS Code Remote-SSH
+### 7b — VS Code Remote-SSH
 
 Install the **Remote - SSH** extension:
 
@@ -509,7 +701,7 @@ Connect: press `F1` → **Remote-SSH: Connect to Host…** → select `aiserver`
 
 VS Code will install its server component on the remote machine automatically.
 
-### 6c — CUDA development tools (install on AI server)
+### 7c — CUDA development tools (install on AI server)
 
 ```bash
 # On the AI server — check NVIDIA driver
@@ -528,7 +720,7 @@ source ~/.bashrc
 nvcc --version
 ```
 
-### 6d — Python AI/ML environment (on AI server)
+### 7d — Python AI/ML environment (on AI server)
 
 ```bash
 # On the AI server
@@ -543,19 +735,19 @@ pip install tensorflow[and-cuda]
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
-### 6e — PyCharm remote interpreter
+### 7e — PyCharm remote interpreter
 
 1. Open PyCharm → Settings → Project → Python Interpreter → **Add Interpreter** → **On SSH**.
 2. Fill in the SSH host details and select the `~/ai-env` virtual environment on the server.
 
-### 6f — CLion remote development
+### 7f — CLion remote development
 
 1. Settings → Build, Execution, Deployment → **Toolchains** → add **Remote Host**.
 2. Configure the SSH connection and set the remote GCC/CMake paths.
 
 ---
 
-**⏹ Session 6 stopping point** — Remote AI development environment configured.
+**⏹ Session 7 stopping point** — Remote AI development environment configured.
 
 ---
 
@@ -569,7 +761,8 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 | 2 | Session 4 | ESP32 (PlatformIO + IDF) |
 | 3 | Session 5a | IceBreaker FPGA (yosys/nextpnr) |
 | 3–4 | Session 5b | Basys3 FPGA (Vivado — start download early) |
-| 4 | Session 6 | Remote AI development |
+| 4 | Session 6 | PIC assembly (HP488 + PICKit 3 + ICD) |
+| 5 | Session 7 | Remote AI development |
 
 ---
 
@@ -603,4 +796,39 @@ sudo usermod -aG plugdev $USER
 sudo apt install -y libtinfo5
 # If not available:
 sudo ln -sf /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.5
+```
+
+### PICKit 3: device not found / permission denied
+
+Ensure the udev rule is installed and you are in the `plugdev` group:
+
+```bash
+sudo usermod -aG plugdev $USER
+# Log out and back in, or:
+newgrp plugdev
+lsusb | grep "04d8"   # check PICKit 3 is detected
+```
+
+If the rule still doesn't apply, reload udev:
+
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+### PICKit 3: "target not detected" or VDD error
+
+- Confirm the ICD 6-pin cable is fully seated on both the PICKit 3 and HP488 board headers.
+- Check pin 1 alignment (marked by a triangle/notch on the connector).
+- If the HP488 board is self-powered, disable "Power target from PICKit 3" in
+  **Project Properties → PICKit 3 → Power**.
+- If using LVP mode, ensure the PIC device's LVP configuration bit matches the project
+  settings.
+
+### MPLAB IPE: `ipecmd.sh` not found
+
+Verify your MPLAB X installation path and substitute the correct version number:
+
+```bash
+ls /opt/microchip/mplabx/
+/opt/microchip/mplabx/<version>/mplab_ipe/ipecmd.sh --help
 ```
