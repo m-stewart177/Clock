@@ -41,7 +41,7 @@ ls /dev/ttyUSB*   # or /dev/ttyACM*
 Connect to any serial monitor (replace `/dev/ttyUSB0` and baud rate as needed):
 
 ```bash
-picocom -b 9600 /dev/ttyUSB0
+picocom -b 115200 /dev/ttyUSB0
 # Exit picocom with Ctrl-A then Ctrl-X
 ```
 
@@ -87,8 +87,73 @@ xa --version
 WozMon uses a plain ASCII protocol. Connect with picocom:
 
 ```bash
-picocom -b 1200 /dev/ttyUSB0   # adjust baud to your board
+picocom -b 115200 /dev/ttyUSB0   # adjust baud to your board
 ```
+
+#### Assemble + link + prepare binary (6502)
+
+Create a tiny example in `hello.s`:
+
+```asm
+        .org $0200
+        lda #$42
+        sta $d020
+        rts
+```
+
+Assemble and link with cc65/ca65/ld65 (or `cl65`):
+
+```bash
+ca65 hello.s -o hello.o
+ld65 -t none -o hello.bin hello.o
+# or with cl65 in one step:
+# cl65 -t none -o hello.bin hello.s
+```
+
+Confirm byte length:
+
+```bash
+ls -l hello.bin
+```
+
+Convert binary to text bytes suitable for WozMon `AAAA: DD DD ...` input:
+
+```bash
+# format as lines of 16 bytes with address prefix
+python3 - <<'PY'
+from pathlib import Path
+data = Path('hello.bin').read_bytes()
+addr = 0x0200
+for i in range(0, len(data), 16):
+    chunk = data[i:i+16]
+    hexbytes = ' '.join(f'{b:02X}' for b in chunk)
+    print(f'{addr+i:04X}: {hexbytes}')
+PY
+```
+
+Copy each line and paste it into the WozMon prompt. WozMon accepts the same address/bytes syntax.
+
+#### In WozMon
+
+- `AAAA: DD DD ...` writes bytes starting at address `AAAA`.
+- `AAAA` alone examines memory at that address.
+- `AAAAR` runs code at address `AAAA`.
+
+Example (after program upload):
+
+```text
+0200: A9 42 8D 20 D0 60
+0200R
+```
+
+This writes the assembled machine code to $0200 and runs it.
+
+WozMon does not require a separate file upload step when using the ASCII debugger protocol; instead the host sends writes directly.
+
+WozMon upload notes:
+
+- Keep lines short (16 bytes) and avoid line wrapping in your terminal emulator.
+- If your board supports a block loader, use that instead for larger binaries.
 
 WozMon quick reference:
 
@@ -151,10 +216,10 @@ cmoc --version
 
 ### Using Assist09 over serial
 
-Assist09 uses a simple text protocol at typically 9600 baud:
+Assist09 uses a simple text protocol at 115200 baud:
 
 ```bash
-picocom -b 9600 /dev/ttyUSB0
+picocom -b 115200 /dev/ttyUSB0
 ```
 
 Assist09 quick reference:
@@ -165,6 +230,45 @@ Assist09 quick reference:
 | `G AAAA`       | Go (run) at address AAAA |
 | `D AAAA BBBB`  | Dump memory from AAAA to BBBB |
 | `L`            | Load S-record (Motorola SREC) via serial |
+
+#### Assemble + link + prepare SREC (6809)
+
+Create an example in `hello.asm`:
+
+```asm
+* = $1000
+        LDA #$42
+        STA $1000
+        RTS
+```
+
+Assemble + link with lwtools:
+
+```bash
+lwasm -o hello.o hello.asm
+lwlink -o hello.bin hello.o
+```
+
+Optionally use cmoc orbit for C source (single command):
+
+```bash
+cmoc -o hello.bin hello.c
+```
+
+Convert binary to Motorola S-record for Assist09:
+
+```bash
+srec_cat hello.bin -binary -offset 0x1000 -o hello.s19 -motorola
+```
+
+Upload via `L` in Assist09:
+
+```text
+L
+# sends hello.s19 over serial with picocom / sx / cat as appropriate
+```
+
+Or manually use `D`/`M` commands for small payloads with byte writes.
 
 Convert a binary to Motorola S-record format for upload:
 
@@ -248,6 +352,70 @@ Alternatively, use `sx` (part of `lrzsz`):
 ```bash
 sudo apt install -y lrzsz
 sx output.hex > /dev/ttyUSB0 < /dev/ttyUSB0
+```
+
+### Z80 monitor commands (Mon >)
+
+On power-up you get a signon screen; press `M` to enter the monitor and use direct commands at `Mon >`.
+
+- No backspace; last four digits before Return are used as the argument.
+- If mistaken, continue typing the correct four digits (e.g., typing `99579958` is taken as `9958`).
+
+Commands:
+
+- `A` : arithmetic. Enter `Mon >A`, then `x` + Return, `y` + Return. Output: `SUM DIFF RJ`.
+- `B` : return to BASIC (no args).
+- `C` : copy memory. Syntax:
+  - `Mon >C` + Return
+  - source address + Return (e.g., `9000`)
+  - dest address + Return (e.g., `9800`)
+  - length (hex bytes) + Return (e.g., `80` for 0x80 bytes)
+- `D` : display memory. `Mon >D9000` + Return shows 8 lines × 16 bytes.
+- `G` : go/run. `Mon >G9000` + Return starts executing at 0x9000; abort with `.` if unintentional.
+- `I` : Intel HEX load. Type `I` then send the file over serial; loader validates checksums, non-hex chars, and prints `.` per line.
+- `M` : modify memory. `Mon >M9000` + Return enters prompted modify mode.
+  - existing byte shown at each address
+  - type new byte (2 hex digits) + Return to change, or Return to keep
+  - `.` alone + Return exits to `Mon >`.
+
+Argument handling: all command parameters use the last four digits before Enter; for bytes the last two digits.
+
+#### Assemble/link/upload for Z80
+
+Create an example `hello.asm`:
+
+```asm
+.org 0x9000
+ld hl,0x9000
+ld (0x9002),hl
+ret
+```
+
+Assemble/link with `z80asm`/`sdcc`/`z88dk`:
+
+```bash
+z80asm -o hello.bin hello.asm
+# or zcc +z80 -o hello.bin hello.c
+```
+
+Convert to Intel HEX:
+
+```bash
+srec_cat hello.bin -Binary -o hello.hex -Intel -offset 0x9000
+```
+
+Load into monitor with `I` and file transfer:
+
+```bash
+picocom -b 115200 /dev/ttyUSB0
+# in monitor: I
+# then send hello.hex via picocom Ctrl-A Ctrl-S or using sx / cat pipe
+```
+
+After load, run with:
+
+```text
+Mon >G9000
 ```
 
 ---
