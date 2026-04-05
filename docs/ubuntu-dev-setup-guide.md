@@ -4,10 +4,8 @@ This guide covers setting up a full development environment on Ubuntu 24.04.4, s
 convenient evening sessions. Each session is self-contained with a clear stopping point.
 
 > **Note on PDF / email:** To convert this guide to PDF, run:
-> ```bash
 > sudo apt install pandoc texlive-xetex
 > pandoc ubuntu-dev-setup-guide.md -o ubuntu-dev-setup-guide.pdf --pdf-engine=xelatex
-> ```
 
 ---
 
@@ -116,20 +114,26 @@ Confirm byte length:
 ls -l hello.bin
 ```
 
-Convert binary to text bytes suitable for WozMon `AAAA: DD DD ...` input:
+Convert binary to text bytes suitable for WozMon `AAAA: DD DD ...` input using the provided helper script:
 
 ```bash
-# format as lines of 16 bytes with address prefix
-python3 - <<'PY'
-from pathlib import Path
-data = Path('hello.bin').read_bytes()
-addr = 0x0200
-for i in range(0, len(data), 16):
-    chunk = data[i:i+16]
-    hexbytes = ' '.join(f'{b:02X}' for b in chunk)
-    print(f'{addr+i:04X}: {hexbytes}')
-PY
+cd /home/mstewart/Projects/Clock/6502
+./BinToWoz.py hello.bin
+# This writes hello.txt by default (same name + .txt)
+cat hello.txt
 ```
+
+If you prefer manual conversion, use Python as shown earlier.
+
+### Upload via `WozMonLoader.py`
+
+A convenient script can automatically upload `hello.txt` to the board by sending one line at a time and waiting for response before each send:
+
+```bash
+python3 /home/mstewart/Projects/Clock/6502/WozMonLoader.py /dev/ttyUSB0 hello.txt --baud 115200 --timeout 1.0
+```
+
+Then switch to your terminal emulator for WozMon commands (`AAAA` / `AAAAR`).
 
 Copy each line and paste it into the WozMon prompt. WozMon accepts the same address/bytes syntax.
 
@@ -168,7 +172,7 @@ WozMon quick reference:
 
 Install the **65xx Assembly** VS Code extension for syntax highlighting:
 
-```
+```raw
 Ext ID: tlgkccampbell.code-6502
 ```
 
@@ -445,7 +449,7 @@ pio --version
 
 Install the **PlatformIO IDE** extension in VS Code:
 
-```
+```raw
 Ext ID: platformio.platformio-ide
 ```
 
@@ -674,34 +678,26 @@ MPLAB X IDE provides full PICKit 3 programmer and ICD debugger support on Linux.
 
 1. Download the latest Linux installer from Microchip's website:
 
-   ```
    https://www.microchip.com/mplab/mplab-x-ide
-   ```
 
    Choose the **Linux** version (`.tar`).
 
 2. Extract and run the installer:
 
-   ```bash
    tar -xf MPLABX-v*.tar
    cd MPLABX-v*-linux-installer/
    sudo ./MPLABX-v*-linux-installer.sh
-   ```
 
    Install to the default path `/opt/microchip/mplabx/<version>`.
 
 3. Add MPLAB tools to your `PATH` (add to `~/.bashrc`):
 
-   ```bash
    echo 'export PATH="/opt/microchip/mplabx/$(ls /opt/microchip/mplabx/ | tail -1)/mplab_platform/bin:$PATH"' >> ~/.bashrc
    source ~/.bashrc
-   ```
 
 4. Verify:
 
-   ```bash
    mplabx --version    # or launch: /opt/microchip/mplabx/<version>/bin/mplabx
-   ```
 
 ### 6c — Install MPLAB XC8 Compiler
 
@@ -709,23 +705,17 @@ The XC8 compiler targets all 8-bit PIC devices and integrates directly with MPLA
 
 1. Download the Linux installer from:
 
-   ```
    https://www.microchip.com/en-us/tools-resources/develop/mplab-xc-compilers
-   ```
 
 2. Install:
 
-   ```bash
    chmod +x xc8-v*.sh
    sudo ./xc8-v*.sh --mode unattended --unattendedmodeui minimal \
        --installdir /opt/microchip/xc8/<version>
-   ```
 
 3. Verify:
 
-   ```bash
    xc8 --version
-   ```
 
    MPLAB X will auto-detect XC8 on first launch.
 
@@ -809,13 +799,13 @@ gplink -m -o my_program.hex my_program.o
 
 Install the **MPASM** syntax-highlighting extension for VS Code:
 
-```
+```raw
 Ext ID: bjorn-w.mpasm
 ```
 
 Or use a generic assembly highlighter:
 
-```
+```raw
 Ext ID: maziac.asm-code-lens
 ```
 
@@ -847,7 +837,7 @@ ssh username@ai-server-hostname
 
 Add a convenient alias to `~/.ssh/config`:
 
-```
+```raw
 Host aiserver
     HostName ai-server-hostname
     User username
@@ -861,7 +851,7 @@ Then simply: `ssh aiserver`
 
 Install the **Remote - SSH** extension:
 
-```
+```raw
 Ext ID: ms-vscode-remote.remote-ssh
 ```
 
