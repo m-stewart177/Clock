@@ -223,8 +223,10 @@ cmoc --version
 Assist09 uses a simple text protocol at 115200 baud:
 
 ```bash
-picocom -b 115200 /dev/ttyUSB0
+picocom -b 115200 /dev/ttyUSB0 --send-cmd "cat"
 ```
+
+> **Note:** `--send-cmd "cat"` is required so that `Ctrl-A Ctrl-S` sends the S-record file as plain ASCII. The default `sz` (ZMODEM) will not work with Assist09's `L` loader.
 
 Assist09 quick reference:
 
@@ -240,20 +242,28 @@ Assist09 quick reference:
 Create an example in `hello.asm`:
 
 ```asm
-* = $1000
-        LDA #$42
-        STA $1000
+        SECTION CODE
+
+start:
+        LDA     #$42
+        STA     $2000    ; store to RAM, not $1000 where the code lives
         RTS
 ```
 
-Assemble + link with lwtools:
+Assemble and link with lwtools:
 
 ```bash
-lwasm -o hello.o hello.asm
-lwlink -o hello.bin hello.o
+lwasm --format=obj --output=hello.o hello.asm
+lwlink --format=raw --output=hello.bin --section-base=CODE=0x1000 hello.o
 ```
 
-Optionally use cmoc orbit for C source (single command):
+Or assemble directly to a flat binary (no linker needed for a single-file program):
+
+```bash
+lwasm --format=raw --output=hello.bin --org=0x1000 hello.asm
+```
+
+Optionally use cmoc for C source:
 
 ```bash
 cmoc -o hello.bin hello.c
@@ -262,25 +272,25 @@ cmoc -o hello.bin hello.c
 Convert binary to Motorola S-record for Assist09:
 
 ```bash
-srec_cat hello.bin -binary -offset 0x1000 -o hello.s19 -motorola
+sudo apt install -y srecord
+srec_cat hello.bin -Binary -offset 0x1000 \
+  -o hello.s19 -Motorola 2 \
+  -disable=header -disable=data-count \
+  -Execution_Start_Address 0x1000
 ```
+
+This form generates S1 data records and a terminating S9 record.
+
+> **Why this matters:** `-Execution_Start_Address` is what causes `srec_cat` to emit the S9 terminator. Without it, you may only get S1/S5 records.
 
 Upload via `L` in Assist09:
 
 ```text
 L
-# sends hello.s19 over serial with picocom / sx / cat as appropriate
+# send hello.s19 over serial using your terminal's send-file feature
 ```
 
-Or manually use `D`/`M` commands for small payloads with byte writes.
-
-Convert a binary to Motorola S-record format for upload:
-
-```bash
-srec_cat input.bin -Binary -offset 0x1000 -o output.s19 -Motorola
-# srec_cat is part of the srecord package:
-sudo apt install -y srecord
-```
+Or manually use `D`/`M` commands for very small payloads.
 
 ---
 
@@ -304,20 +314,27 @@ sudo apt install -y srecord
 ### Install z88dk (recommended — full C + assembler suite)
 
 ```bash
-sudo apt install -y z88dk
-# Verify
-zcc +z80 --version
+sudo apt install -y z88dk || echo "z88dk not in this Ubuntu repo; use source build below"
+# Quick verify (if apt package exists)
+z80asm -h | head -n 2
 ```
 
 Or install from source for the latest version:
 
 ```bash
-sudo apt install -y libboost-dev
+sudo apt install -y libboost-dev libgmp-dev pkg-config libxml2-dev
 git clone --recursive https://github.com/z88dk/z88dk.git
 cd z88dk
 chmod +x build.sh
+export PATH="$PWD/bin:$PATH"
 ./build.sh
-sudo make install
+# Optional: install system-wide
+# sudo make install
+
+# If using local tree, set environment in your shell:
+export Z88DK_HOME="$PWD"
+export ZCCCFG="$Z88DK_HOME/lib/config"
+export PATH="$Z88DK_HOME/bin:$PATH"
 ```
 
 ### Install SDCC (Small Device C Compiler)
@@ -345,6 +362,7 @@ srec_cat input.bin -Binary -offset 0x0100 -o output.hex -Intel
 Most simple Z80 monitors accept Intel HEX via serial. After connecting:
 
 ```bash
+ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
 picocom -b 115200 /dev/ttyUSB0
 ```
 
@@ -389,7 +407,7 @@ Argument handling: all command parameters use the last four digits before Enter;
 Create an example `hello.asm`:
 
 ```asm
-.org 0x9000
+org 0x9000
 ld hl,0x9000
 ld (0x9002),hl
 ret
@@ -398,14 +416,27 @@ ret
 Assemble/link with `z80asm`/`sdcc`/`z88dk`:
 
 ```bash
-z80asm -o hello.bin hello.asm
-# or zcc +z80 -o hello.bin hello.c
+# Check which assembler is on PATH
+command -v z80asm
+z80asm -h | head -n 3
+
+# Option A: z88dk z80asm (recommended for this guide)
+export Z88DK_HOME="/home/mstewart/Projects/z88dk"
+export ZCCCFG="$Z88DK_HOME/lib/config"
+export PATH="$Z88DK_HOME/bin:$PATH"
+z80asm -b -o=hello.bin hello.asm
+
+# Option B: alternate/system z80asm syntax (if Option A errors)
+z80asm -ohello.bin -lhello.lst hello.asm
+
+# z88dk C path
+zcc +test -vn -c hello.c -o hello.o
 ```
 
 Convert to Intel HEX:
 
 ```bash
-srec_cat hello.bin -Binary -o hello.hex -Intel -offset 0x9000
+srec_cat hello.bin -Binary -offset 0x9000 -o hello.hex -Intel
 ```
 
 Load into monitor with `I` and file transfer:
@@ -926,12 +957,87 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 
 ## Troubleshooting
 
+### Z80: z88dk package not found in apt
+
+Some Ubuntu releases do not provide z88dk in the default repositories.
+
+```bash
+sudo apt install -y z88dk || echo "z88dk not available in apt on this release"
+# Build from source instead:
+sudo apt install -y libboost-dev libgmp-dev pkg-config libxml2-dev
+git clone --recursive https://github.com/z88dk/z88dk.git
+cd z88dk
+export PATH="$PWD/bin:$PATH"
+./build.sh
+```
+
+### Z80: ./build.sh fails with gmp.h missing
+
+Install the GMP development package and rebuild:
+
+```bash
+sudo apt install -y libgmp-dev
+cd z88dk
+export PATH="$PWD/bin:$PATH"
+./build.sh
+```
+
+### Z80: ./build.sh fails with pkg-config or libxml headers missing
+
+Install pkg-config and XML headers, then rebuild:
+
+```bash
+sudo apt install -y pkg-config libxml2-dev
+cd z88dk
+export PATH="$PWD/bin:$PATH"
+./build.sh
+```
+
+### Z80: build fails in libsrc with zcc not found
+
+This is usually a PATH issue in nested make steps.
+
+```bash
+cd z88dk
+export PATH="$PWD/bin:$PATH"
+./build.sh
+```
+
+For interactive use after a local build:
+
+```bash
+export Z88DK_HOME="$HOME/z88dk"
+export ZCCCFG="$Z88DK_HOME/lib/config"
+export PATH="$Z88DK_HOME/bin:$PATH"
+```
+
+### Z80: z80asm syntax or option errors
+
+Use z88dk z80asm syntax and options:
+
+```bash
+# Use org (not .org) in source
+z80asm -b -o=hello.bin hello.asm
+```
+
 ### Serial port permission denied
 
 ```bash
 sudo usermod -aG dialout $USER
 # Then log out and back in
 ```
+
+### picocom exits immediately / returns code 1
+
+Check that you are using a real serial device path and that no other terminal already owns the port:
+
+```bash
+ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+lsof /dev/ttyUSB0
+picocom -b 115200 /dev/ttyUSB0
+```
+
+If access is denied, add your user to `dialout` and start a new login session.
 
 ### FTDI device not recognised
 
