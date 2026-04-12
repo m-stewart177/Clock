@@ -432,6 +432,14 @@ z80asm -ohello.bin -lhello.lst hello.asm
 # z88dk C path
 zcc +test -vn -c hello.c -o hello.o
 ```
+```sh
+command -v z80asm
+command -v zcc
+```
+```sh
+command -v z80asm
+command -v zcc
+```
 
 Convert to Intel HEX:
 
